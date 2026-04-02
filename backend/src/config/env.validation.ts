@@ -1,3 +1,7 @@
+/**
+ * ConfigModule.forRoot({ validate }) 에 넘기는 함수.
+ * process.env 를 Zod 로 파싱해 잘못된 값이면 앱이 바로 죽고, 타입이 맞는 객체를 반환합니다.
+ */
 import { z } from 'zod';
 
 export const envSchema = z.object({

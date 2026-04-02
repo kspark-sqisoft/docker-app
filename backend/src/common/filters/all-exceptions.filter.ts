@@ -1,3 +1,7 @@
+/**
+ * 처리되지 않은 예외를 한 형식의 JSON 으로 응답합니다.
+ * HttpException(404 등)은 그 메시지를, 그 외(Error)는 개발에선 원인·운영에선 일반 문구로 숨깁니다.
+ */
 import {
   ArgumentsHost,
   Catch,

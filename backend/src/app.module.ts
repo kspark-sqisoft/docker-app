@@ -1,3 +1,6 @@
+/**
+ * 루트 모듈: 설정(Config)·DB(TypeORM)·기능 모듈(Health, Posts)을 조립합니다.
+ */
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -9,8 +12,8 @@ import { PostsModule } from './posts/posts.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true,
-      validate: validateEnv,
+      isGlobal: true, // 어느 모듈에서든 ConfigService 주입 가능
+      validate: validateEnv, // 기동 시 .env 값을 Zod 로 검증
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -23,9 +26,9 @@ import { PostsModule } from './posts/posts.module';
           username: config.get('DB_USERNAME', 'board'),
           password: config.get('DB_PASSWORD', 'board'),
           database: config.get('DB_NAME', 'board'),
-          entities: [Post],
-          synchronize: true,
-          logging: nodeEnv === 'development',
+          entities: [Post], // 이 엔티티들만 테이블과 매핑 (여기서는 Post 하나)
+          synchronize: true, // 공부용: 엔티티 변경 시 스키마 자동 맞춤 (운영에서는 보통 false + 마이그레이션)
+          logging: nodeEnv === 'development', // 개발에서만 SQL 로그
         };
       },
       inject: [ConfigService],
