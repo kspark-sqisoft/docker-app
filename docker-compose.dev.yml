@@ -1,0 +1,80 @@
+# 개발용: 소스 볼륨 마운트 + Nest/Vite watch (핫 리로드)
+# 사용: docker compose -f docker-compose.dev.yml up
+# --build 는 Dockerfile.dev / entrypoint 스크립트를 바꾼 뒤에만 사용 (매번 할 필요 없음)
+# 운영 스택과 겹치지 않도록 프로젝트 이름을 분리합니다.
+name: study-board-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: study-board-db-dev
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-board}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-board}
+      POSTGRES_DB: ${DB_NAME:-board}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: study-board-api-dev
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-board}
+      DB_PASSWORD: ${DB_PASSWORD:-board}
+      DB_NAME: ${DB_NAME:-board}
+      PORT: 3000
+      CHOKIDAR_USEPOLLING: 'true'
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'wget -qO- http://127.0.0.1:3000/api/health >/dev/null || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: study-board-web-dev
+    ports:
+      - '5173:5173'
+      # 운영(nginx 8080)과 같은 주소로 열고 싶을 때 — 동일 Vite 프로세스에 연결
+      - '8080:5173'
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:3000
+      DOCKER_DEV: 'true'
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data_dev:
+  backend_node_modules:
+  frontend_node_modules:
