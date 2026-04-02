@@ -29,7 +29,16 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-      "prettier/prettier": ["error", { endOfLine: "auto" }],
+      // .prettierrc 와 동일 (printWidth 80 → 저장 시 긴 줄이 자주 줄바꿈됨)
+      'prettier/prettier': [
+        'error',
+        {
+          endOfLine: 'auto',
+          singleQuote: true,
+          trailingComma: 'all',
+          printWidth: 80,
+        },
+      ],
     },
   },
 );
