@@ -2,6 +2,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
+import { DataSource } from 'typeorm';
 import { AppModule } from './../src/app.module';
 
 /**
@@ -15,9 +16,17 @@ import { AppModule } from './../src/app.module';
  * (호스트 `localhost`, DB/사용자 `board` — `.env` 와 맞출 것)
  *
  * main.ts 와 맞추기: 전역 prefix `api`, ValidationPipe 동일 설정.
+ *
+ * **데이터 정리:** 트랜잭션 롤백은 HTTP+풀 구조에서 쓰기 어렵습니다.
+ * 개발 DB 를 같이 쓰는 경우를 위해 **`TRUNCATE` 는 쓰지 않고**, 제목이
+ * `E2E_TITLE_PREFIX` 로 시작하는 행만 `DELETE` 합니다. (일반 글은 유지)
  */
+/** 이 접두사로 시작하는 글만 e2e 가 만들고, 훅에서 지웁니다. */
+const E2E_TITLE_PREFIX = '__study_board_e2e__';
+
 describe('Posts API (e2e)', () => {
   let app: INestApplication<App> | undefined;
+  let dataSource: DataSource;
 
   /** supertest 가 붙을 HTTP 서버 (인메모리, 실제 포트 리슨과는 별개) */
   function httpRequest() {
@@ -41,10 +50,22 @@ describe('Posts API (e2e)', () => {
     );
     await nestApp.init();
     app = nestApp;
+    dataSource = nestApp.get(DataSource);
   }, 60_000);
+
+  async function deleteE2ePostsOnly() {
+    await dataSource.query(`DELETE FROM posts WHERE title LIKE $1`, [
+      `${E2E_TITLE_PREFIX}%`,
+    ]);
+  }
+
+  beforeEach(async () => {
+    await deleteE2ePostsOnly();
+  });
 
   afterAll(async () => {
     if (app) {
+      await deleteE2ePostsOnly();
       await app.close();
       app = undefined;
     }
@@ -64,11 +85,10 @@ describe('Posts API (e2e)', () => {
   });
 
   it('POST /api/posts — 작성 후 목록에 포함', async () => {
-    // 제목에 타임스탬프를 넣어 다른 테스트·기존 데이터와 충돌 줄임
-    const title = `e2e-${Date.now()}`;
+    const title = `${E2E_TITLE_PREFIX}${Date.now()}`;
     await httpRequest()
       .post('/api/posts')
-      .send({ title, content: 'e2e 본문' })
+      .send({ title, content: 'e2e 테스트 본문' })
       .expect(201);
 
     const res = await httpRequest().get('/api/posts').expect(200);
@@ -79,7 +99,7 @@ describe('Posts API (e2e)', () => {
   it('DELETE /api/posts/:id — 작성 후 삭제', async () => {
     const createRes = await httpRequest()
       .post('/api/posts')
-      .send({ title: `del-${Date.now()}`, content: 'x' })
+      .send({ title: `${E2E_TITLE_PREFIX}del_${Date.now()}`, content: 'x' })
       .expect(201);
     const created = createRes.body as { id: string };
 

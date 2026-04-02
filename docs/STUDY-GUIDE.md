@@ -376,6 +376,8 @@ npm test
 
 `.env` 를 이미 두고 `ConfigModule` 이 읽는 값이 `localhost`·`board` 와 맞다면, PowerShell 에서 `DB_*` 를 일일이 넣지 않아도 됩니다.
 
+**E2E 후 DB 데이터:** `app.e2e-spec.ts` 는 **`TRUNCATE` 를 쓰지 않습니다.** 제목이 `__study_board_e2e__` 로 시작하는 행만 `DELETE` 해서, 로컬 개발 중 작성한 다른 글은 남깁니다. (우연히 같은 접두사로 글을 쓰면 지워질 수 있음.) supertest+풀 구조에서는 트랜잭션 `ROLLBACK` 패턴과는 맞추기 어렵다는 점은 동일합니다.
+
 **`pg` 버전:** `node-postgres` 8.19 이상은 같은 연결에서 겹치는 `query()` 호출에 대해 Node `DeprecationWarning` 을 냅니다. TypeORM 의 스키마 조회 경로에서 종종 발생하므로, 이 프로젝트는 **`pg` 를 8.18.0 으로 고정**해 두었습니다. TypeORM 쪽에서 순차 실행으로 정리된 버전이 안정적으로 나오면 올려도 됩니다.
 
 ### 7-8. 스키마 자동 반영 (`synchronize`) — 공부용 참고
