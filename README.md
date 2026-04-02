@@ -69,9 +69,21 @@ docker compose -f docker-compose.dev.yml down
 
 **Windows:** 예전에 `exec ... docker-dev-entrypoint.sh: no such file or directory` 가 났다면 셸 스크립트 CRLF 문제였습니다. 현재 `Dockerfile.dev` 에서 빌드 시 줄바꿈을 정리하므로, 그때는 **`up --build`** 로 이미지를 다시 빌드하면 됩니다.
 
+## 백엔드 테스트 (Jest)
+
+`backend` 폴더에서 실행합니다.
+
+| 명령 | 종류 | DB(Postgres) |
+|------|------|----------------|
+| `npm test` | **단위 테스트** (`src/**/*.spec.ts`) | 불필요 |
+| `npm run test:e2e` | **E2E** (`test/app.e2e-spec.ts`, 실제 HTTP + DB) | 필요 (`docker compose up -d db` 등) |
+
+**차이 요약:** 단위는 서비스·컨트롤러 등을 **목으로 떼어** 빠르게 검증하고, E2E는 **앱 전체를 띄워** API·DB 까지 통과하는지 확인합니다.  
+명령어·환경 변수·주의점은 **[docs/STUDY-GUIDE.md](docs/STUDY-GUIDE.md)** 의 **7-7절**에 정리해 두었습니다.
+
 ## 문서
 
-단계별 개념과 절차는 **[docs/STUDY-GUIDE.md](docs/STUDY-GUIDE.md)** 를 먼저 읽는 것을 권장합니다. **실행 후 API·8080 프록시·브라우저·e2e 테스트 확인**은 가이드 **7절**에 체크리스트로 정리되어 있습니다.
+단계별 개념과 절차는 **[docs/STUDY-GUIDE.md](docs/STUDY-GUIDE.md)** 를 먼저 읽는 것을 권장합니다. **실행 후 API·8080 프록시·브라우저·테스트**는 가이드 **7절**(단위/E2E 포함)에 체크리스트로 정리되어 있습니다.
 
 ## 구성
 

@@ -10,9 +10,7 @@ async function bootstrap() {
   app.use(helmet());
   const corsOrigin = process.env.CORS_ORIGIN;
   app.enableCors({
-    origin: corsOrigin
-      ? corsOrigin.split(',').map((s) => s.trim())
-      : true,
+    origin: corsOrigin ? corsOrigin.split(',').map((s) => s.trim()) : true,
     credentials: true,
   });
   app.useGlobalFilters(new AllExceptionsFilter());

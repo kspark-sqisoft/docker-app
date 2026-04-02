@@ -308,18 +308,45 @@ UI까지 되면 전체 파이프라인(프론트 → nginx → API → Postgres)
 
 다시 `up` 하면 코드·이미지는 그대로 두고 컨테이너만 새로 뜹니다. 데이터를 유지한 채 재시작하려면 `-v` 없이 `down` 만 쓰면 됩니다.
 
-### 7-7. Nest E2E 테스트 (`npm run test:e2e`)
+### 7-7. 백엔드 테스트: `npm test`(단위)와 `npm run test:e2e`(E2E)
 
-`backend/test/app.e2e-spec.ts` 는 실제 **Postgres 에 붙는** 설정을 씁니다. 따라서 DB 가 떠 있어야 합니다.
+둘 다 **Jest**를 쓰지만, 검증 범위와 준비가 다릅니다. 실행은 항상 **`backend` 디렉터리**에서 합니다.
 
-**절차 예시**
+| 구분 | 단위 테스트 (`npm test`) | E2E (`npm run test:e2e`) |
+|------|--------------------------|---------------------------|
+| **스크립트** | `package.json` 의 `"test"` → `jest` | `"test:e2e"` → `jest --config ./test/jest-e2e.json` |
+| **파일 위치** | `src/**/*.spec.ts` (예: 서비스·컨트롤러·DTO) | `test/**/*.e2e-spec.ts` |
+| **무엇을 검증하나** | 클래스·함수 **한 단위**. DB·HTTP 는 대부분 **목(mock)** 으로 대체 | **실제 HTTP 요청**으로 앱을 띄우고, **진짜 Postgres** + TypeORM + 라우팅까지 한 번에 검증 |
+| **DB(Postgres)** | **필요 없음** | **필수** (연결 실패 시 훅 타임아웃·재시도 로그) |
+| **속도** | 보통 수 초 이내 | DB 기동·연결 포함하면 더 김 (`jest-e2e.json` 에 `testTimeout` 설정) |
 
-1. 루트에서 DB 만 띄우거나, 이미 전체 스택이 떠 있으면 그대로 둡니다.  
+**언제 무엇을 쓰나 (감각)**
+
+- **단위 (`npm test`)**: 로직·DTO 검증을 빠르게 자주 돌릴 때. CI에서 DB 없이 돌리기 좋습니다.  
+- **E2E (`npm run test:e2e`)**: “API 가 실제로 응답하고 DB 와 맞물리는지” 통로 전체를 확인할 때.
+
+#### 단위 테스트 실행
+
+```powershell
+cd backend
+npm test
+```
+
+자주 쓰는 변형:
+
+- `npm run test:watch` — 파일 저장 시 다시 실행  
+- `npm run test:cov` — 커버리지 리포트  
+
+#### E2E 테스트 실행
+
+`test/app.e2e-spec.ts` 는 **`AppModule` 전체**를 로드하므로 TypeORM 이 **호스트에서** Postgres 로 붙습니다. DB 컨테이너만 띄우거나, 이미 `docker compose up` 으로 스택이 떠 있으면 됩니다.
+
+1. 프로젝트 **루트**에서 DB 만 기동(또는 전체 스택이 이미 Up).  
    ```powershell
    docker compose up -d db
    ```
-2. 루트 `.env` 의 `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` 이 컨테이너와 같아야 합니다(기본 `board` / `board` / `board`).  
-3. 백엔드 폴더에서 호스트가 DB 에 붙도록 환경 변수를 맞춘 뒤 테스트를 실행합니다.  
+2. 루트 `.env` 의 `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` 이 Postgres 컨테이너와 같아야 합니다(기본 `board` / `board` / `board`).  
+3. **호스트에서** Jest 를 돌리므로 DB 주소는 **`localhost`** 입니다. (Compose **안**의 `backend` 서비스는 `DB_HOST=db` 를 씁니다.)  
    ```powershell
    cd backend
    $env:DB_HOST="localhost"
@@ -330,7 +357,7 @@ UI까지 되면 전체 파이프라인(프론트 → nginx → API → Postgres)
    npm run test:e2e
    ```
 
-전체를 Docker 로만 돌리고 호스트에서 테스트만 할 때는 위처럼 **`DB_HOST=localhost`** 가 맞습니다. (Compose 안의 `backend` 서비스는 `DB_HOST=db` 를 씁니다.)
+`.env` 를 이미 두고 `ConfigModule` 이 읽는 값이 `localhost`·`board` 와 맞다면, PowerShell 에서 `DB_*` 를 일일이 넣지 않아도 됩니다.
 
 ### 7-8. 스키마 자동 반영 (`synchronize`) — 공부용 참고
 
