@@ -9,7 +9,7 @@
 
 | 구분 | 기술 | 역할 |
 |------|------|------|
-| **백엔드** | NestJS | REST API (`/api/posts` 목록·작성·삭제), Postgres 연동 |
+| **백엔드** | NestJS | REST API (`/api/posts` 목록·작성·삭제), `GET /api/health` 상태 점검(Compose·E2E 등), Postgres 연동 |
 | **DB** | PostgreSQL 16 | 글 데이터 저장 |
 | **프론트** | React + Vite | 브라우저 UI |
 | **실행** | Docker Compose | DB·API·웹을 한 번에 띄움 |
@@ -113,6 +113,23 @@ copy .env.example .env
 ```
 
 기본값은 사용자/DB 이름 `board`, 비밀번호 `board` 입니다. **실서비스에서는 반드시 강한 비밀번호로 변경**하세요.
+
+### 5-4. `GET /api/health` 는 언제 쓰이나
+
+게시글 API(`/api/posts`)와 달리, **브라우저 게시판 UI가 호출하는 용도가 아닙니다.** “백엔드 HTTP 서버가 떠 있고 응답할 수 있는가”만 가볍게 확인하는 **상태(liveness) 점검용** 엔드포인트입니다. 구현은 `backend/src/health/*`, 응답 예: `{ "status": "ok", "timestamp": "…" }`.
+
+**이 프로젝트에서의 실제 사용처**
+
+1. **Docker Compose `healthcheck`**  
+   `docker-compose.yml` / `docker-compose.dev.yml` 의 `backend` 서비스가 컨테이너 **안에서** 주기적으로 `http://127.0.0.1:3000/api/health` 를 호출합니다. 성공하면 컨테이너를 **healthy** 로 표시합니다.
+2. **`frontend` 기동 순서**  
+   `depends_on: backend: condition: service_healthy` 때문에, 백엔드 헬스가 통과한 뒤에만 프론트 컨테이너가 올라가게 됩니다.
+3. **E2E 테스트**  
+   `npm run test:e2e` 가 `GET /api/health` 가 200·`status: ok` 인지 한 번 검증합니다.
+4. **그 밖**  
+   운영 환경에서는 로드밸런서·오케스트레이션(Kubernetes readiness/liveness)·모니터링 도구가 비슷한 URL을 두드리는 패턴이 흔합니다. 수동으로는 `curl http://localhost:3000/api/health` 등으로 확인할 수 있습니다.
+
+DB 연결 여부까지 확인하려면 `@nestjs/terminus` 로 DB ping 을 붙이는 식으로 확장할 수 있지만, **지금 엔드포인트는 Nest 앱 기동·HTTP 응답만** 검증합니다.
 
 ---
 
@@ -265,7 +282,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-`db`, `backend`, `frontend` 가 모두 **실행 중(Up)** 이고, `db` 가 **healthy** 로 보이면 다음 단계로 넘어가면 됩니다.
+`db`, `backend`, `frontend` 가 모두 **실행 중(Up)** 이고, `db`·`backend` 가 **healthy** 로 보이면 다음 단계로 넘어가면 됩니다. (`backend` 는 `GET /api/health` 로 검사 — **5-4절**)
 
 ### 7-3. API 직접 호출 (백엔드 포트)
 
@@ -359,6 +376,8 @@ npm test
 
 `.env` 를 이미 두고 `ConfigModule` 이 읽는 값이 `localhost`·`board` 와 맞다면, PowerShell 에서 `DB_*` 를 일일이 넣지 않아도 됩니다.
 
+**`pg` 버전:** `node-postgres` 8.19 이상은 같은 연결에서 겹치는 `query()` 호출에 대해 Node `DeprecationWarning` 을 냅니다. TypeORM 의 스키마 조회 경로에서 종종 발생하므로, 이 프로젝트는 **`pg` 를 8.18.0 으로 고정**해 두었습니다. TypeORM 쪽에서 순차 실행으로 정리된 버전이 안정적으로 나오면 올려도 됩니다.
+
 ### 7-8. 스키마 자동 반영 (`synchronize`) — 공부용 참고
 
 `src/app.module.ts` 의 TypeORM 설정에 **`synchronize: true`** 가 들어 있습니다. 엔티티를 바꾸면 개발 중에 테이블이 자동으로 맞춰져서 편하지만, **운영 환경에서는 데이터 손실·의도치 않은 변경 위험**이 있어 보통 **마이그레이션**으로 전환합니다. 모듈·파일 위치는 [10. 백엔드 구조 메모](#10-백엔드-구조-메모-posts-모듈)와 함께 보면 됩니다.
@@ -419,7 +438,8 @@ Invoke-RestMethod -Uri http://localhost:3000/api/posts -Method Get
 - `src/posts/posts.service.ts` — DB 접근  
 - `src/posts/posts.controller.ts` — HTTP 라우트  
 - `src/posts/posts.module.ts` — 모듈 묶음  
-- `src/app.module.ts` — `ConfigModule`, `TypeOrmModule`, `PostsModule` 등록  
+- `src/app.module.ts` — `ConfigModule`, `TypeOrmModule`, `HealthModule`, `PostsModule` 등록  
+- `src/health/*` — `GET /api/health` (Compose healthcheck·E2E 등 — **5-4절**)
 
 **공부용 주의:** `synchronize: true` 는 개발 편의를 위해 엔티티 변경 시 스키마를 자동 맞춥니다. **운영 환경에서는 마이그레이션 도구 사용을 권장**합니다. (실행·검증 절차는 [7-8. 스키마 자동 반영](#7-8-스키마-자동-반영-synchronize--공부용-참고) 참고.)
 
@@ -439,7 +459,7 @@ docker volume ls                 # 볼륨 목록 (postgres_data 확인)
 
 ## 12. 다음에 해볼 만한 것
 
-- 백엔드/프론트에 **헬스체크** 엔드포인트와 Compose `healthcheck` 연동  
+- **`GET /api/health` 확장** — `@nestjs/terminus` 로 Postgres 연결까지 검사(현재는 HTTP 기동만 확인, **5-4절** 참고)  
 - `synchronize: false` + TypeORM 마이그레이션  
 - 로그인·작성자 필드 추가 (이번 범위 밖이지만 자연스러운 확장)
 

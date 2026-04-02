@@ -12,6 +12,7 @@ docker compose up -d --build
 
 - **웹:** http://localhost:8080
 - **API:** http://localhost:3000/api/posts
+- **헬스(상태 점검):** http://localhost:3000/api/health — 게시판 UI가 쓰는 API가 아니라, Docker Compose `healthcheck`·E2E 등에서 “백엔드가 응답하는지” 확인할 때 사용합니다. 자세한 설명은 **STUDY-GUIDE 5-4절** 참고.
 
 **이미 한 번 빌드한 뒤라면** 평소에는 아래만으로 충분합니다.
 
@@ -63,7 +64,7 @@ docker compose -f docker-compose.dev.yml down
 (`Dockerfile.dev` / `docker-dev-entrypoint.sh` / `package.json`·lock 을 바꾼 뒤에는 `up --build` 로 이미지 재빌드 — 위 표 참고)
 
 - **웹:** http://localhost:5173 (또는 운영과 같은 **http://localhost:8080** — 개발 Compose 가 8080→Vite 로 연결)
-- **API:** http://localhost:3000/api/posts
+- **API:** http://localhost:3000/api/posts · **헬스:** http://localhost:3000/api/health (용도는 위 빠른 시작과 동일, **STUDY-GUIDE 5-4절**)
 
 의존성은 `package.json`·`package-lock.json` 이 바뀔 때만 컨테이너 안에서 `npm install` 됩니다(평소 `up` 이 빠름). 모듈 오류가 나면 `docker volume ls` 에서 `*_node_modules` 볼륨을 지운 뒤 다시 `up` 하세요.
 
