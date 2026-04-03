@@ -1,53 +1,34 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
+import { configureNestApp } from './../src/bootstrap/configure-app';
 import { AppModule } from './../src/app.module';
 
 /**
  * E2E(End-to-End) 테스트
  *
- * - **실제** Nest 앱(`AppModule`)을 띄우고, **실제 HTTP**(supertest)로 API 를 호출합니다.
- * - TypeORM 이 **진짜 Postgres** 에 붙으므로 DB 가 떠 있어야 합니다.
- *
- * 예: 프로젝트 루트에서 `docker compose up -d db` 또는
- * `docker compose -f docker-compose.dev.yml up -d db`
- * (호스트 `localhost`, DB/사용자 `board` — `.env` 와 맞출 것)
- *
- * main.ts 와 맞추기: 전역 prefix `api`, ValidationPipe 동일 설정.
- *
- * **데이터 정리:** 트랜잭션 롤백은 HTTP+풀 구조에서 쓰기 어렵습니다.
- * 개발 DB 를 같이 쓰는 경우를 위해 **`TRUNCATE` 는 쓰지 않고**, 제목이
- * `E2E_TITLE_PREFIX` 로 시작하는 행만 `DELETE` 합니다. (일반 글은 유지)
+ * **데이터 정리:** 제목 `E2E_TITLE_PREFIX`, 이메일 `E2E_EMAIL_PREFIX` 만 삭제합니다.
  */
-/** 이 접두사로 시작하는 글만 e2e 가 만들고, 훅에서 지웁니다. */
 const E2E_TITLE_PREFIX = '__study_board_e2e__';
+const E2E_EMAIL_PREFIX = '__study_board_e2e_user_';
 
-describe('Posts API (e2e)', () => {
+describe('App (e2e)', () => {
   let app: INestApplication<App> | undefined;
   let dataSource: DataSource;
 
-  /** supertest 가 붙을 HTTP 서버 (인메모리, 실제 포트 리슨과는 별개) */
   function httpRequest() {
     return request(app!.getHttpServer());
   }
 
-  // 스위트 전체에서 앱 한 번만 기동 — DB 연결 비용·시간 절약
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     const nestApp = moduleFixture.createNestApplication();
-    nestApp.setGlobalPrefix('api');
-    nestApp.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
+    configureNestApp(nestApp);
     await nestApp.init();
     app = nestApp;
     dataSource = nestApp.get(DataSource);
@@ -59,53 +40,176 @@ describe('Posts API (e2e)', () => {
     ]);
   }
 
+  async function deleteE2eUsersOnly() {
+    await dataSource.query(`DELETE FROM users WHERE email LIKE $1`, [
+      `${E2E_EMAIL_PREFIX}%`,
+    ]);
+  }
+
   beforeEach(async () => {
     await deleteE2ePostsOnly();
+    await deleteE2eUsersOnly();
   });
 
   afterAll(async () => {
     if (app) {
       await deleteE2ePostsOnly();
+      await deleteE2eUsersOnly();
       await app.close();
       app = undefined;
     }
   });
 
   it('GET /api/health — 상태', async () => {
-    // Docker healthcheck 와 동일 엔드포인트 — 프로세스가 응답하는지
     const res = await httpRequest().get('/api/health').expect(200);
     const body = res.body as { status: string; timestamp: string };
     expect(body).toMatchObject({ status: 'ok' });
     expect(body.timestamp).toBeDefined();
   });
 
-  it('GET /api/posts — 목록', async () => {
+  it('GET /api/posts — 목록(본문 없음)', async () => {
     const res = await httpRequest().get('/api/posts').expect(200);
-    expect(Array.isArray(res.body)).toBe(true);
+    const list = res.body as Record<string, unknown>[];
+    expect(Array.isArray(list)).toBe(true);
+    if (list.length > 0) {
+      expect(list[0]).not.toHaveProperty('content');
+      expect(list[0]).toHaveProperty('authorName');
+    }
   });
 
-  it('POST /api/posts — 작성 후 목록에 포함', async () => {
-    const title = `${E2E_TITLE_PREFIX}${Date.now()}`;
+  it('POST /api/posts — 비로그인 401', async () => {
     await httpRequest()
       .post('/api/posts')
-      .send({ title, content: 'e2e 테스트 본문' })
-      .expect(201);
-
-    const res = await httpRequest().get('/api/posts').expect(200);
-    const list = res.body as { title: string }[];
-    expect(list.some((p) => p.title === title)).toBe(true);
+      .send({ title: `${E2E_TITLE_PREFIX}x`, content: 'c' })
+      .expect(401);
   });
 
-  it('DELETE /api/posts/:id — 작성 후 삭제', async () => {
+  it('POST /api/posts — 로그인 후 작성·상세·목록·삭제', async () => {
+    const email = `${E2E_EMAIL_PREFIX}${Date.now()}@example.com`;
+    const reg = await httpRequest()
+      .post('/api/auth/register')
+      .send({
+        email,
+        password: 'e2e_pass_8chars',
+        name: 'E2E Poster',
+      })
+      .expect(201);
+    const { accessToken } = reg.body as { accessToken: string };
+
+    const title = `${E2E_TITLE_PREFIX}${Date.now()}`;
     const createRes = await httpRequest()
       .post('/api/posts')
-      .send({ title: `${E2E_TITLE_PREFIX}del_${Date.now()}`, content: 'x' })
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ title, content: '본문 내용' })
       .expect(201);
-    const created = createRes.body as { id: string };
+    const created = createRes.body as {
+      id: string;
+      content: string;
+      authorId: string;
+    };
+    expect(created.content).toBe('본문 내용');
+    expect(created.authorId).toBeDefined();
 
-    await httpRequest().delete(`/api/posts/${created.id}`).expect(200);
+    const one = await httpRequest()
+      .get(`/api/posts/${created.id}`)
+      .expect(200);
+    expect((one.body as { title: string }).title).toBe(title);
 
-    // 두 번째 삭제는 없는 id → 서비스에서 NotFoundException → 404
-    await httpRequest().delete(`/api/posts/${created.id}`).expect(404);
+    const list = await httpRequest().get('/api/posts').expect(200);
+    expect(
+      (list.body as { id: string }[]).some((p) => p.id === created.id),
+    ).toBe(true);
+
+    await httpRequest()
+      .patch(`/api/posts/${created.id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ title: `${title}_edited` })
+      .expect(200);
+
+    await httpRequest()
+      .delete(`/api/posts/${created.id}`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .expect(200);
+
+    await httpRequest().get(`/api/posts/${created.id}`).expect(404);
+  });
+
+  it('DELETE /api/posts/:id — 다른 사용자 403', async () => {
+    const emailA = `${E2E_EMAIL_PREFIX}a_${Date.now()}@example.com`;
+    const emailB = `${E2E_EMAIL_PREFIX}b_${Date.now()}@example.com`;
+    const regA = await httpRequest()
+      .post('/api/auth/register')
+      .send({
+        email: emailA,
+        password: 'e2e_pass_8chars',
+        name: 'A',
+      })
+      .expect(201);
+    const regB = await httpRequest()
+      .post('/api/auth/register')
+      .send({
+        email: emailB,
+        password: 'e2e_pass_8chars',
+        name: 'B',
+      })
+      .expect(201);
+    const tokenA = (regA.body as { accessToken: string }).accessToken;
+    const tokenB = (regB.body as { accessToken: string }).accessToken;
+
+    const title = `${E2E_TITLE_PREFIX}own_${Date.now()}`;
+    const createRes = await httpRequest()
+      .post('/api/posts')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ title, content: 'x' })
+      .expect(201);
+    const id = (createRes.body as { id: string }).id;
+
+    await httpRequest()
+      .delete(`/api/posts/${id}`)
+      .set('Authorization', `Bearer ${tokenB}`)
+      .expect(403);
+  });
+
+  it('POST /api/auth/register — 가입 후 GET /api/auth/me', async () => {
+    const email = `${E2E_EMAIL_PREFIX}${Date.now()}@example.com`;
+    const reg = await httpRequest()
+      .post('/api/auth/register')
+      .send({
+        email,
+        password: 'e2e_pass_8chars',
+        name: 'E2E User',
+      })
+      .expect(201);
+    const body = reg.body as { accessToken: string; user: { id: string } };
+    expect(body.accessToken).toBeDefined();
+    expect(body.user?.id).toBeDefined();
+
+    await httpRequest()
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${body.accessToken}`)
+      .expect(200)
+      .expect((res) => {
+        expect((res.body as { email: string }).email).toBe(email);
+      });
+  });
+
+  it('POST /api/auth/refresh — 쿠키로 액세스 토큰 재발급', async () => {
+    const email = `${E2E_EMAIL_PREFIX}ref_${Date.now()}@example.com`;
+    const agent = request.agent(app!.getHttpServer());
+    const reg = await agent
+      .post('/api/auth/register')
+      .send({
+        email,
+        password: 'e2e_pass_8chars',
+        name: 'E2E Refresh',
+      })
+      .expect(201);
+    const first = reg.body as { accessToken: string };
+    expect(first.accessToken).toBeDefined();
+
+    const ref = await agent.post('/api/auth/refresh').expect(200);
+    const second = ref.body as { accessToken: string };
+    expect(second.accessToken).toBeDefined();
+    expect(second.accessToken).not.toBe(first.accessToken);
   });
 });

@@ -1,13 +1,17 @@
 /**
- * TypeORM 엔티티 = DB 테이블 `posts` 와 1:1 매핑되는 클래스.
- * 컬럼 타입·제약은 여기 정의하고, synchronize 시 스키마에 반영됩니다.
+ * TypeORM 엔티티 = DB 테이블 `posts` 와 1:1 매핑.
+ * authorId 로 작성자만 수정·삭제 가능(API 에서 검증).
  */
 import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+import { User } from '../../users/entities/user.entity';
 
 @Entity('posts')
 export class Post {
@@ -20,6 +24,16 @@ export class Post {
   @Column('text')
   content: string;
 
-  @CreateDateColumn() // INSERT 시 DB 기본값처럼 생성 시각 기록
+  @Column('uuid', { nullable: true })
+  authorId: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'authorId' })
+  author: User | null;
+
+  @CreateDateColumn()
   createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

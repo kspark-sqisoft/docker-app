@@ -1,6 +1,7 @@
 # Docker 스터디 가이드 — 간단 게시판 (NestJS + Postgres + React/Vite)
 
-이 문서는 **로그인 없는 게시판**을 만들면서, 프로젝트 구조·Docker 이미지·컨테이너·Compose·데이터 영속화를 **순서대로** 이해하기 위한 공부용 안내입니다.  
+이 문서는 **게시판 + Docker**를 만들면서, 프로젝트 구조·Docker 이미지·컨테이너·Compose·데이터 영속화를 **순서대로** 이해하기 위한 공부용 안내입니다.  
+게시글 API 는 공개이며, **JWT·회원·프로필 이미지** 흐름은 [README.md](../README.md) 의 **인증 설계 요약**을 참고하면 됩니다.  
 코드나 설정이 바뀌면 이 파일도 함께 맞춰 두는 것이 좋습니다.
 
 ---
@@ -9,7 +10,7 @@
 
 | 구분 | 기술 | 역할 |
 |------|------|------|
-| **백엔드** | NestJS | REST API (`/api/posts` 목록·작성·삭제), `GET /api/health` 상태 점검(Compose·E2E 등), Postgres 연동 |
+| **백엔드** | NestJS | REST API (`/api/posts` 목록·상세 공개, 작성·수정·삭제는 JWT·작성자, `/api/auth/*`), `GET /api/health`, Postgres 연동 |
 | **DB** | PostgreSQL 16 | 글 데이터 저장 |
 | **프론트** | React + Vite | 브라우저 UI |
 | **실행** | Docker Compose | DB·API·웹을 한 번에 띄움 |
@@ -70,12 +71,12 @@ docker compose version
 ### 4-2. `frontend/Dockerfile`
 
 1. **builder**: 의존성 설치 → `npm run build` → 정적 파일 `dist/`  
-2. **nginx:alpine**: 빌드 결과를 nginx 웹 루트에 복사, `nginx.conf`로 `/api` 를 백엔드로 **리버스 프록시**
+2. **nginx:alpine**: 빌드 결과를 nginx 웹 루트에 복사, `nginx.conf`로 `/api`·`/uploads` 를 백엔드로 **리버스 프록시**
 
 프론트는 **Tailwind CSS v4**(`@tailwindcss/vite`)와 **shadcn/ui**(Nova 프리셋, Geist 폰트, `src/components/ui/*`)를 씁니다.  
 빌드 단계에서는 Windows 등에서 만든 `package-lock.json` 과 Linux 의 `npm ci` 가 어긋날 수 있어, 이 프로젝트 **프론트 Dockerfile** 은 `npm ci` 대신 **`npm install`** 로 맞춰 두었습니다. (CI/팀에서 lock 을 Linux 기준으로 고정하면 다시 `npm ci` 로 바꿀 수 있습니다.)
 
-브라우저는 **항상 `http://localhost:8080`** 만 보면 되고, API 호출은 같은 출처의 `/api/...` 로 가므로 CORS 부담이 줄어듭니다.  
+브라우저는 **항상 `http://localhost:8080`** 만 보면 되고, API·프로필 이미지는 같은 출처의 `/api/...`, `/uploads/...` 로 가므로 CORS 부담이 줄어듭니다.  
 (로컬 `npm run dev` 는 `vite.config.ts` 의 `proxy` 로 `localhost:3000` 에 넘깁니다.)
 
 ### 4-3. `.dockerignore`
@@ -421,9 +422,11 @@ npm run dev
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| GET | `/api/posts` | 목록 (최신순) |
-| POST | `/api/posts` | 작성 (JSON: `title`, `content`) |
-| DELETE | `/api/posts/:id` | 삭제 |
+| GET | `/api/posts` | 목록 (최신순, 본문 없음·작성자명) |
+| GET | `/api/posts/:id` | 상세 |
+| POST | `/api/posts` | 작성 (JSON, **Bearer JWT**) |
+| PATCH | `/api/posts/:id` | 수정 (**작성자만**, Bearer) |
+| DELETE | `/api/posts/:id` | 삭제 (**작성자만**, Bearer) |
 
 예시 (PowerShell 에서 curl 대신 Invoke-RestMethod 등 사용 가능):
 

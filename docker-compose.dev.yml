@@ -38,6 +38,10 @@ services:
       DB_NAME: ${DB_NAME:-board}
       PORT: 3000
       CHOKIDAR_USEPOLLING: 'true'
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-study_board_jwt_access_dev_key_32chars_min!!}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_DAYS: ${JWT_REFRESH_EXPIRES_DAYS:-7}
+      REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules

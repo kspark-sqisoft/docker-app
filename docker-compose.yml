@@ -33,6 +33,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-board}
       DB_NAME: ${DB_NAME:-board}
       PORT: 3000
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-study_board_jwt_access_dev_key_32chars_min!!}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_DAYS: ${JWT_REFRESH_EXPIRES_DAYS:-7}
+      REFRESH_COOKIE_SECURE: ${REFRESH_COOKIE_SECURE:-false}
+      UPLOADS_DIR: /app/uploads
+    volumes:
+      - backend_uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -59,3 +66,4 @@ services:
 
 volumes:
   postgres_data:
+  backend_uploads:

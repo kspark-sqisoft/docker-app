@@ -1,13 +1,15 @@
 /**
- * 루트 모듈: 설정(Config)·DB(TypeORM)·기능 모듈(Health, Posts)을 조립합니다.
+ * 루트 모듈: 설정(Config)·DB(TypeORM)·기능 모듈(Health, Posts, Auth)을 조립합니다.
  */
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
+import { AuthModule } from './auth/auth.module';
 import { Post } from './posts/entities/post.entity';
 import { PostsModule } from './posts/posts.module';
+import { User } from './users/entities/user.entity';
 
 @Module({
   imports: [
@@ -26,7 +28,7 @@ import { PostsModule } from './posts/posts.module';
           username: config.get('DB_USERNAME', 'board'),
           password: config.get('DB_PASSWORD', 'board'),
           database: config.get('DB_NAME', 'board'),
-          entities: [Post], // 이 엔티티들만 테이블과 매핑 (여기서는 Post 하나)
+          entities: [Post, User],
           synchronize: true, // 공부용: 엔티티 변경 시 스키마 자동 맞춤 (운영에서는 보통 false + 마이그레이션)
           logging: nodeEnv === 'development', // 개발에서만 SQL 로그
         };
@@ -35,6 +37,7 @@ import { PostsModule } from './posts/posts.module';
     }),
     HealthModule,
     PostsModule,
+    AuthModule,
   ],
 })
 export class AppModule {}
