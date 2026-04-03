@@ -128,10 +128,34 @@ export function PostDetailPage() {
               ) : null}
             </div>
           </CardHeader>
-          <CardContent className="pt-6">
+          <CardContent className="space-y-6 pt-6">
             <p className="text-card-foreground whitespace-pre-wrap text-sm leading-relaxed sm:text-base">
               {post.content}
             </p>
+            {post.imageUrls && post.imageUrls.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-xs font-medium">
+                  첨부 이미지
+                </p>
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {post.imageUrls.map((src) => (
+                    <li
+                      key={src}
+                      className="overflow-hidden rounded-lg ring-1 ring-border"
+                    >
+                      <div className="bg-muted/30">
+                        <img
+                          src={src}
+                          alt=""
+                          className="max-h-96 w-full object-contain"
+                          loading="lazy"
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

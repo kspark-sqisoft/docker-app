@@ -16,9 +16,11 @@ export function resolveUploadsRoot(): string {
 
 export function ensureUploadDirs(): void {
   const root = resolveUploadsRoot();
-  const profiles = join(root, 'profiles');
-  if (!existsSync(profiles)) {
-    mkdirSync(profiles, { recursive: true });
+  for (const sub of ['profiles', 'posts'] as const) {
+    const dir = join(root, sub);
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
   }
 }
 

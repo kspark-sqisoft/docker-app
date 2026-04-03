@@ -1,4 +1,4 @@
-import { useActionState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createPost, postsKeys } from '@/api/posts';
@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { CreateSubmitButton } from '@/features/posts/components/CreateSubmitButton';
+import { PostImageAttachments } from '@/features/posts/components/PostImageAttachments';
 
 type FormState = {
   error: string | null;
@@ -27,15 +28,27 @@ export function PostCreatePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [imageBusy, setImageBusy] = useState(false);
+  const imageUrlsRef = useRef<string[]>([]);
+  useEffect(() => {
+    imageUrlsRef.current = imageUrls;
+  }, [imageUrls]);
 
   const createMutation = useMutation({
-    mutationFn: (input: { title: string; content: string }) => {
+    mutationFn: (input: {
+      title: string;
+      content: string;
+      imageUrls?: string[];
+    }) => {
       if (!accessToken) throw new Error('로그인이 필요합니다.');
       return createPost(accessToken, input);
     },
     onSuccess: (post) => {
       void queryClient.invalidateQueries({ queryKey: postsKeys.list() });
-      void queryClient.invalidateQueries({ queryKey: postsKeys.detail(post.id) });
+      void queryClient.invalidateQueries({
+        queryKey: postsKeys.detail(post.id),
+      });
       navigate(`/posts/${post.id}`, { replace: true });
     },
   });
@@ -54,7 +67,11 @@ export function PostCreatePage() {
         };
       }
       try {
-        await createMutation.mutateAsync(parsed.data);
+        const urls = imageUrlsRef.current;
+        await createMutation.mutateAsync({
+          ...parsed.data,
+          ...(urls.length > 0 ? { imageUrls: urls } : {}),
+        });
         return { error: null, fieldErrors: null };
       } catch (e) {
         return {
@@ -117,7 +134,15 @@ export function PostCreatePage() {
                 </p>
               ) : null}
             </div>
-            <CreateSubmitButton />
+            {accessToken ? (
+              <PostImageAttachments
+                accessToken={accessToken}
+                imageUrls={imageUrls}
+                onChange={setImageUrls}
+                onBusyChange={setImageBusy}
+              />
+            ) : null}
+            <CreateSubmitButton extraDisabled={imageBusy} />
           </form>
         </CardContent>
       </Card>

@@ -12,6 +12,7 @@ export type PostListItem = {
 export type PostDetail = PostListItem & {
   content: string;
   updatedAt: string;
+  imageUrls: string[];
 };
 
 type FetchError = Error & { status: number };
@@ -59,9 +60,26 @@ export async function fetchPost(id: string): Promise<PostDetail> {
   return res.json();
 }
 
+export async function uploadPostImage(
+  token: string,
+  file: File,
+): Promise<{ url: string }> {
+  const body = new FormData();
+  body.append('file', file);
+  const res = await fetch('/api/posts/images', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body,
+  });
+  if (!res.ok) {
+    throwHttpError(res, await parseErrorMessage(res, '이미지 업로드에 실패했습니다.'));
+  }
+  return res.json() as Promise<{ url: string }>;
+}
+
 export async function createPost(
   token: string,
-  input: { title: string; content: string },
+  input: { title: string; content: string; imageUrls?: string[] },
 ): Promise<PostDetail> {
   const res = await fetch('/api/posts', {
     method: 'POST',
@@ -77,7 +95,7 @@ export async function createPost(
 export async function updatePost(
   token: string,
   id: string,
-  input: { title?: string; content?: string },
+  input: { title?: string; content?: string; imageUrls?: string[] },
 ): Promise<PostDetail> {
   const res = await fetch(`/api/posts/${id}`, {
     method: 'PATCH',

@@ -24,6 +24,10 @@ export class Post {
   @Column('text')
   content: string;
 
+  /** 정적 경로 `/uploads/posts/…` 목록 (최대 개수는 서비스에서 검증) */
+  @Column('jsonb', { default: () => "'[]'::jsonb" })
+  imageUrls: string[];
+
   @Column('uuid', { nullable: true })
   authorId: string | null;
 

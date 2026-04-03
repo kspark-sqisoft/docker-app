@@ -1,8 +1,13 @@
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { fetchPost, postsKeys, updatePost } from '@/api/posts';
+import {
+  fetchPost,
+  postsKeys,
+  updatePost,
+  type PostDetail,
+} from '@/api/posts';
 import { parseCreatePostForm } from '@/schemas/post-forms';
 import { useAuthStore } from '@/features/auth/store/auth-store';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -17,6 +22,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PostImageAttachments } from '@/features/posts/components/PostImageAttachments';
 
 type FetchErr = Error & { status?: number };
 
@@ -25,37 +31,29 @@ type FormState = {
   fieldErrors: { title?: string; content?: string } | null;
 };
 
-export function PostEditPage() {
-  const { postId } = useParams<{ postId: string }>();
+type PostEditFormProps = {
+  post: PostDetail;
+};
+
+function PostEditForm({ post }: PostEditFormProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((s) => s.accessToken);
-  const user = useAuthStore((s) => s.user);
+  const postId = post.id;
 
-  const [defaults, setDefaults] = useState<{
-    title: string;
-    content: string;
-  } | null>(null);
-
-  const {
-    data: post,
-    isPending: loadingPost,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: postsKeys.detail(postId ?? ''),
-    queryFn: () => fetchPost(postId!),
-    enabled: !!postId,
-  });
-
+  const [imageUrls, setImageUrls] = useState(() => post.imageUrls ?? []);
+  const [imageBusy, setImageBusy] = useState(false);
+  const imageUrlsRef = useRef<string[]>(post.imageUrls ?? []);
   useEffect(() => {
-    if (post) {
-      setDefaults({ title: post.title, content: post.content });
-    }
-  }, [post]);
+    imageUrlsRef.current = imageUrls;
+  }, [imageUrls]);
 
   const updateMutation = useMutation({
-    mutationFn: (input: { title: string; content: string }) => {
+    mutationFn: (input: {
+      title: string;
+      content: string;
+      imageUrls: string[];
+    }) => {
       if (!accessToken || !postId) throw new Error('로그인이 필요합니다.');
       return updatePost(accessToken, postId, input);
     },
@@ -82,7 +80,10 @@ export function PostEditPage() {
         };
       }
       try {
-        await updateMutation.mutateAsync(parsed.data);
+        await updateMutation.mutateAsync({
+          ...parsed.data,
+          imageUrls: imageUrlsRef.current,
+        });
         return { error: null, fieldErrors: null };
       } catch (e) {
         return {
@@ -93,6 +94,94 @@ export function PostEditPage() {
     },
     { error: null, fieldErrors: null },
   );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>글 수정</CardTitle>
+        <CardDescription>제목·내용을 수정한 뒤 저장합니다.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {state.error ? (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTitle>오류</AlertTitle>
+            <AlertDescription>{state.error}</AlertDescription>
+          </Alert>
+        ) : null}
+        <form action={formAction} className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="edit-title">제목</Label>
+            <Input
+              id="edit-title"
+              name="title"
+              maxLength={200}
+              defaultValue={post.title}
+              aria-invalid={!!state.fieldErrors?.title}
+            />
+            {state.fieldErrors?.title ? (
+              <p className="text-destructive text-xs">
+                {state.fieldErrors.title}
+              </p>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-content">내용</Label>
+            <Textarea
+              id="edit-content"
+              name="content"
+              rows={10}
+              className="min-h-40 resize-y"
+              defaultValue={post.content}
+              aria-invalid={!!state.fieldErrors?.content}
+            />
+            {state.fieldErrors?.content ? (
+              <p className="text-destructive text-xs">
+                {state.fieldErrors.content}
+              </p>
+            ) : null}
+          </div>
+          {accessToken ? (
+            <PostImageAttachments
+              accessToken={accessToken}
+              imageUrls={imageUrls}
+              onChange={setImageUrls}
+              onBusyChange={setImageBusy}
+            />
+          ) : null}
+          <Button
+            type="submit"
+            disabled={updateMutation.isPending || imageBusy}
+            className="gap-2"
+          >
+            {updateMutation.isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                저장 중…
+              </>
+            ) : (
+              '저장'
+            )}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function PostEditPage() {
+  const { postId } = useParams<{ postId: string }>();
+  const user = useAuthStore((s) => s.user);
+
+  const {
+    data: post,
+    isPending: loadingPost,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: postsKeys.detail(postId ?? ''),
+    queryFn: () => fetchPost(postId!),
+    enabled: !!postId,
+  });
 
   const err = error as FetchErr | null;
 
@@ -126,77 +215,13 @@ export function PostEditPage() {
         </Alert>
       ) : null}
 
-      {loadingPost || !defaults ? (
+      {loadingPost || !post ? (
         <div className="text-muted-foreground flex items-center gap-2 py-12 text-sm">
           <Loader2 className="size-5 animate-spin" aria-hidden />
           불러오는 중…
         </div>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>글 수정</CardTitle>
-            <CardDescription>제목·내용을 수정한 뒤 저장합니다.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {state.error ? (
-              <Alert variant="destructive" className="mb-4">
-                <AlertTitle>오류</AlertTitle>
-                <AlertDescription>{state.error}</AlertDescription>
-              </Alert>
-            ) : null}
-            <form
-              key={`${defaults.title}\0${defaults.content}`}
-              action={formAction}
-              className="space-y-5"
-            >
-              <div className="space-y-2">
-                <Label htmlFor="edit-title">제목</Label>
-                <Input
-                  id="edit-title"
-                  name="title"
-                  maxLength={200}
-                  defaultValue={defaults.title}
-                  aria-invalid={!!state.fieldErrors?.title}
-                />
-                {state.fieldErrors?.title ? (
-                  <p className="text-destructive text-xs">
-                    {state.fieldErrors.title}
-                  </p>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-content">내용</Label>
-                <Textarea
-                  id="edit-content"
-                  name="content"
-                  rows={10}
-                  className="min-h-40 resize-y"
-                  defaultValue={defaults.content}
-                  aria-invalid={!!state.fieldErrors?.content}
-                />
-                {state.fieldErrors?.content ? (
-                  <p className="text-destructive text-xs">
-                    {state.fieldErrors.content}
-                  </p>
-                ) : null}
-              </div>
-              <Button
-                type="submit"
-                disabled={updateMutation.isPending}
-                className="gap-2"
-              >
-                {updateMutation.isPending ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" aria-hidden />
-                    저장 중…
-                  </>
-                ) : (
-                  '저장'
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <PostEditForm key={post.id} post={post} />
       )}
     </div>
   );

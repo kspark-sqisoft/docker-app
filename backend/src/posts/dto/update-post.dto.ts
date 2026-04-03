@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdatePostDto {
   @IsOptional()
@@ -11,4 +18,10 @@ export class UpdatePostDto {
   @IsString()
   @IsNotEmpty()
   content?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  imageUrls?: string[];
 }
