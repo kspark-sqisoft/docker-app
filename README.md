@@ -125,6 +125,7 @@ E2E 는 `test/jest-e2e.setup.ts` 에서 `JWT_ACCESS_SECRET` 기본값을 채워 
 
 ## 문서
 
+Docker 명령·스택 전환·DB만 실행 등 실행 예는 **[DOCKER.md](DOCKER.md)** 에 모아 두었습니다.  
 단계별 개념과 절차는 **[docs/STUDY-GUIDE.md](docs/STUDY-GUIDE.md)** 를 먼저 읽는 것을 권장합니다. **실행 후 API·8080 프록시·브라우저·테스트**는 가이드 **7절**(단위/E2E 포함)에 체크리스트로 정리되어 있습니다.
 
 ## 구성
