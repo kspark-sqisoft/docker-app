@@ -15,6 +15,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import { diskStorage } from 'multer';
@@ -23,6 +24,7 @@ import { randomUUID } from 'crypto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { SafeUser } from '../users/users.service';
 import { resolveUploadsRoot } from '../bootstrap/configure-app';
+import { ACCESS_TOKEN_REF } from '../bootstrap/configure-swagger';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostsService } from './posts.service';
@@ -34,6 +36,7 @@ const imageMime = new Set([
   'image/gif',
 ]);
 
+@ApiTags('posts')
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
@@ -44,6 +47,21 @@ export class PostsController {
   }
 
   @Post('images')
+  @ApiBearerAuth(ACCESS_TOKEN_REF)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: '게시글 본문용 이미지',
+        },
+      },
+    },
+  })
   @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(
     FileInterceptor('file', {
@@ -78,6 +96,7 @@ export class PostsController {
   }
 
   @Post()
+  @ApiBearerAuth(ACCESS_TOKEN_REF)
   @UseGuards(AuthGuard('jwt'))
   create(@Body() dto: CreatePostDto, @CurrentUser() user: SafeUser) {
     return this.postsService.create(dto, user.id);
@@ -89,6 +108,7 @@ export class PostsController {
   }
 
   @Patch(':id')
+  @ApiBearerAuth(ACCESS_TOKEN_REF)
   @UseGuards(AuthGuard('jwt'))
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -99,6 +119,7 @@ export class PostsController {
   }
 
   @Delete(':id')
+  @ApiBearerAuth(ACCESS_TOKEN_REF)
   @UseGuards(AuthGuard('jwt'))
   remove(
     @Param('id', ParseUUIDPipe) id: string,

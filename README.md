@@ -50,6 +50,7 @@ docker compose up -d --build
 - **웹:** http://localhost:8080 (게시판 UI 는 `/posts`, `/` 는 `/posts` 로 이동)
 - **API:** http://localhost:3000/api/posts
 - **헬스(상태 점검):** http://localhost:3000/api/health — Docker Compose `healthcheck`·E2E 등에서 “백엔드가 응답하는지” 확인할 때 사용합니다. 자세한 설명은 **STUDY-GUIDE 5-4절** 참고.
+- **Swagger(OpenAPI):** http://localhost:3000/docs (Docker nginx 8080 사용 시 http://localhost:8080/docs). 사용 팁은 아래 **Swagger(OpenAPI) 사용 팁** 절 참고.
 
 **이미 한 번 빌드한 뒤라면** 평소에는 아래만으로 충분합니다.
 
@@ -82,6 +83,20 @@ docker compose -f docker-compose.dev.yml up
 ```
 
 반대로 개발에서 운영으로 갈 때는 `docker compose -f docker-compose.dev.yml down` 후 `docker compose up -d` 를 쓰면 됩니다.
+
+## Swagger(OpenAPI) 사용 팁
+
+| 항목 | 설명 |
+|------|------|
+| **어디서 열까** | 백엔드가 떠 있는 호스트 기준으로 **http://localhost:3000/docs** 가 기본입니다. 운영 Compose(프론트 nginx)를 쓰면 **http://localhost:8080/docs** 로도 동일 UI에 접근할 수 있습니다(`nginx.conf`에서 `/docs`·`/docs-json` 프록시). **Vite만** `5173`으로 띄운 경우에는 `/docs` 프록시가 없으므로 **백엔드 포트(3000)의 `/docs`** 로 여세요. |
+| **OpenAPI JSON** | **http://localhost:3000/docs-json** (또는 8080 사용 시 `/docs-json`). Postman·Insomnia 등에 스펙 임포트할 때 사용합니다. |
+| **Try it out** | 각 엔드포인트에서 요청 본문·파라미터를 채운 뒤 **Execute** 하면 실제로 API가 호출됩니다. CORS는 백엔드 설정을 따릅니다. |
+| **Bearer(JWT)** | 우측 상단 **Authorize** → `access-token`(HTTP Bearer)에 **액세스 토큰 문자열만** 넣습니다(`Bearer ` 접두사는 붙이지 않아도 됩니다). `POST /api/auth/register` 또는 `POST /api/auth/login` 응답 JSON의 `accessToken` 값을 복사하면 됩니다. 설정은 브라우저에 잠시 저장됩니다(`persistAuthorization`). |
+| **리프레시 쿠키** | 리프레시 토큰은 **httpOnly 쿠키**라 값을 직접 붙여 넣을 수 없습니다. **같은 브라우저 탭**에서 Swagger를 연 상태로, 먼저 **로그인 또는 회원가입**을 `Try it out`으로 호출해 쿠키를 받은 뒤 `POST /api/auth/refresh` 를 실행하면 됩니다(문서상 **refresh-cookie** 스킴이 켜져 있어야 합니다). |
+| **호출 순서 예시** | ① `register` 또는 `login` → ② **Authorize**에 `accessToken` 입력 → ③ `GET /api/auth/me` 등 보호 API 실행. 액세스 토큰이 만료되면 ①의 쿠키가 남아 있다면 `refresh`로 새 토큰을 받은 뒤 다시 Authorize를 갱신합니다. |
+| **파일 업로드** | `POST /api/auth/me/avatar`, `POST /api/posts/images` 는 **multipart/form-data** 필드 **`file`** 입니다. Try it out에서 파일 선택 후 실행합니다. |
+| **공개 API** | `GET /api/posts`, `GET /api/posts/{id}`, `GET /api/health` 등은 Bearer 없이 호출 가능합니다. |
+| **운영 노출** | 실제 인터넷에 서비스할 때는 API 문서를 외부에 열지 않는 편이 안전합니다. 필요하면 `NODE_ENV === 'production'` 일 때만 `configureSwagger` 호출을 건너뛰도록 코드에서 분기하는 방식을 검토하세요. |
 
 ## 개발용 (Docker + 핫 리로드)
 
@@ -125,7 +140,7 @@ E2E 는 `test/jest-e2e.setup.ts` 에서 `JWT_ACCESS_SECRET` 기본값을 채워 
 
 ## 문서
 
-Docker 명령·스택 전환·DB만 실행 등 실행 예는 **[DOCKER.md](DOCKER.md)** 에 모아 두었습니다.  
+Docker 명령·스택 전환·DB만 실행·**Compose별 Swagger URL** 등은 **[DOCKER.md](DOCKER.md)** 에 모아 두었습니다.  
 단계별 개념과 절차는 **[docs/STUDY-GUIDE.md](docs/STUDY-GUIDE.md)** 를 먼저 읽는 것을 권장합니다. **실행 후 API·8080 프록시·브라우저·테스트**는 가이드 **7절**(단위/E2E 포함)에 체크리스트로 정리되어 있습니다.
 
 ## 구성

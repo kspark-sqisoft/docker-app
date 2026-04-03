@@ -195,7 +195,20 @@ docker compose -f docker-compose.dev.yml build backend
 
 ---
 
+## 10. Swagger(OpenAPI) 접속
+
+백엔드(Nest)가 띄워져 있으면 Swagger UI가 열립니다. **Try it out·Bearer·쿠키** 사용법은 [README.md](README.md)의 **Swagger(OpenAPI) 사용 팁** 절을 보세요.
+
+| 스택 | UI 주소 | 비고 |
+|------|---------|------|
+| 운영 Compose | http://localhost:8080/docs | nginx가 `/docs`·`/docs-json`을 API 컨테이너로 넘김 |
+| 운영 Compose | http://localhost:3000/docs | 백엔드 포트로 직접 접속도 동일 |
+| 개발 Compose | http://localhost:3000/docs | Vite(`5173`)에는 `/docs` 프록시가 없음 → API 포트 사용 |
+| DB만 Docker + 로컬 Nest | http://localhost:3000/docs | 로컬 `npm run start:dev`와 동일 |
+
+---
+
 ## 관련 문서
 
-- 저장소 개요·인증·빠른 시작: [README.md](README.md)
+- 저장소 개요·인증·빠른 시작·Swagger 팁: [README.md](README.md)
 - 단계별 스터디: [docs/STUDY-GUIDE.md](docs/STUDY-GUIDE.md)

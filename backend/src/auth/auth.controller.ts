@@ -13,6 +13,17 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCookieAuth,
+  ApiTags,
+} from '@nestjs/swagger';
+import {
+  ACCESS_TOKEN_REF,
+  REFRESH_COOKIE_SECURITY_REF,
+} from '../bootstrap/configure-swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
 import { diskStorage } from 'multer';
@@ -34,6 +45,7 @@ const imageMime = new Set([
   'image/gif',
 ]);
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -54,6 +66,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth(ACCESS_TOKEN_REF)
   @UseGuards(AuthGuard('jwt'))
   logout(
     @CurrentUser() user: SafeUser,
@@ -69,18 +82,31 @@ export class AuthController {
   }
 
   @Get('me')
+  @ApiBearerAuth(ACCESS_TOKEN_REF)
   @UseGuards(AuthGuard('jwt'))
   me(@CurrentUser() user: SafeUser) {
     return user;
   }
 
   @Patch('me')
+  @ApiBearerAuth(ACCESS_TOKEN_REF)
   @UseGuards(AuthGuard('jwt'))
   updateMe(@CurrentUser() user: SafeUser, @Body() dto: UpdateProfileDto) {
     return this.authService.updateName(user.id, dto.name);
   }
 
   @Post('me/avatar')
+  @ApiBearerAuth(ACCESS_TOKEN_REF)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['file'],
+      properties: {
+        file: { type: 'string', format: 'binary', description: '프로필 이미지' },
+      },
+    },
+  })
   @UseGuards(AuthGuard('jwt'))
   @UseInterceptors(
     FileInterceptor('file', {

@@ -30,7 +30,18 @@ export function configureNestApp(app: INestApplication): void {
 
   const expressApp = app as NestExpressApplication;
   expressApp.use(cookieParser());
-  expressApp.use(helmet());
+  const cspDefaults = helmet.contentSecurityPolicy.getDefaultDirectives();
+  expressApp.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...cspDefaults,
+          'script-src': ["'self'", "'unsafe-inline'"],
+          'style-src': ["'self'", "'unsafe-inline'"],
+        },
+      },
+    }),
+  );
   expressApp.use('/uploads', express.static(resolveUploadsRoot()) as express.RequestHandler);
 
   const corsOrigin = process.env.CORS_ORIGIN;
