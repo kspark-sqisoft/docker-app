@@ -3,6 +3,44 @@ import { Loader2, LogIn, LogOut, MessageSquareText, UserPlus } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/features/auth/store/auth-store';
 
+const pill =
+  'border-border rounded-md border bg-muted/40 px-1.5 py-px text-[0.65rem] font-medium leading-tight text-muted-foreground sm:px-2 sm:py-0.5 sm:text-xs';
+
+/** Vite 프록시 기본과 동일(로컬 단독 백엔드 안내용). */
+const defaultApiTarget = 'http://localhost:3000';
+
+function HeaderStackBadges() {
+  const isDev = import.meta.env.DEV;
+  const modeLabel = isDev ? 'Dev' : 'Prod';
+  const stackTitle = isDev
+    ? `Vite 개발 서버 · /api → ${defaultApiTarget} (프록시)`
+    : '프로덕션 빌드 · API는 배포 환경 기준';
+
+  return (
+    <div
+      className="flex max-w-full shrink-0 flex-wrap items-center gap-1"
+      title={stackTitle}
+    >
+      <span
+        className={
+          isDev
+            ? 'rounded-md border border-amber-500/45 bg-amber-500/12 px-1.5 py-px text-[0.65rem] font-semibold uppercase tracking-wide text-amber-950 dark:text-amber-100 sm:px-2 sm:py-0.5 sm:text-xs'
+            : 'rounded-md border border-emerald-600/35 bg-emerald-600/10 px-1.5 py-px text-[0.65rem] font-semibold uppercase tracking-wide text-emerald-950 dark:text-emerald-100 sm:px-2 sm:py-0.5 sm:text-xs'
+        }
+      >
+        {modeLabel}
+      </span>
+      <span className={pill}>NestJS</span>
+      <span className={`${pill} hidden sm:inline`}>REST API</span>
+      {isDev ? (
+        <span className={`${pill} hidden md:inline`} title={stackTitle}>
+          :3000
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 /** 상단 툴바 한 줄 — 브랜드(좌) · 인증(우). 모바일은 터치 영역·줄바꿈 최소화 */
 export function SiteHeaderBar() {
   const user = useAuthStore((s) => s.user);
@@ -11,18 +49,21 @@ export function SiteHeaderBar() {
 
   return (
     <div className="flex w-full min-w-0 items-center justify-between gap-2 sm:gap-4">
-      <Link
-        to="/posts"
-        className="text-primary flex min-w-0 max-w-[55%] items-center gap-1.5 rounded-md py-1 pr-1 transition-opacity hover:opacity-90 sm:max-w-none sm:gap-2"
-      >
-        <MessageSquareText
-          className="size-6 shrink-0 sm:size-7"
-          aria-hidden
-        />
-        <span className="font-heading truncate text-base font-semibold tracking-tight sm:text-lg">
-          Notice Board
-        </span>
-      </Link>
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+        <Link
+          to="/posts"
+          className="text-primary flex min-w-0 max-w-[min(100%,12rem)] items-center gap-1.5 rounded-md py-1 pr-1 transition-opacity hover:opacity-90 sm:max-w-none sm:gap-2"
+        >
+          <MessageSquareText
+            className="size-6 shrink-0 sm:size-7"
+            aria-hidden
+          />
+          <span className="font-heading truncate text-base font-semibold tracking-tight sm:text-lg">
+            Notice Board
+          </span>
+        </Link>
+        <HeaderStackBadges />
+      </div>
 
       <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
         {!ready ? (

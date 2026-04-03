@@ -4,6 +4,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { join } from 'node:path';
 import { validateEnv } from './config/env.validation';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
@@ -11,11 +12,18 @@ import { Post } from './posts/entities/post.entity';
 import { PostsModule } from './posts/posts.module';
 import { User } from './users/entities/user.entity';
 
+/** `dist/` 또는 `src/` 기준: 리포 루트 `.env` → `backend/.env` 순(뒤가 앞을 덮어씀). CWD 가 backend 여도 루트 env 를 읽음. */
+const envFilePath = [
+  join(__dirname, '..', '..', '.env'),
+  join(__dirname, '..', '.env'),
+];
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true, // 어느 모듈에서든 ConfigService 주입 가능
       validate: validateEnv, // 기동 시 .env 값을 Zod 로 검증
+      envFilePath,
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
